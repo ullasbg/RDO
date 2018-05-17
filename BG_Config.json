@@ -1,0 +1,10 @@
+
+{
+"DEVICE_ID":"PUW1",
+"SERVER_ADDR":"ph.services",
+"SERVER_PATH":"/rawdatado.php",
+"FAIL_PATH":"/dumpdatamp.php"
+}
+
+
+
