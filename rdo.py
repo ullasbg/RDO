@@ -138,7 +138,7 @@ except:
                 base_filename=time.strftime("%d%m%Y")
                 abs_file_name=os.path.join(dir_name, base_filename + "ns." + "dat")
                 f = open(abs_file_name, 'a')
-                print>>f, json.dumps(tofile)
+                print>>f, json.dumps(payload)
                 f.close()
         except:
                 print"Error : NS File not written"
