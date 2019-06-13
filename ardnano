@@ -1,0 +1,169 @@
+#include <Adafruit_SleepyDog.h>
+#include <Wire.h>
+#include "DS3231.h"
+RTClib RTC;
+
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+#include <SDISerial.h>
+#define DATALINE_PIN 2
+SDISerial connection(DATALINE_PIN);
+
+int routerSwitch = 6;
+int PB = 7;
+int GND = 8;
+String inst;
+int rd = 0;
+
+void setup() {
+  Serial.begin (9600);
+  Wire.begin();
+  lcd.init();
+  lcd.backlight();
+
+  pinMode (PB, INPUT_PULLUP);
+  pinMode (GND, OUTPUT);
+  digitalWrite(GND, LOW);
+  pinMode (routerSwitch, OUTPUT);
+  digitalWrite (routerSwitch, HIGH);
+  connection.begin(); // start our SDI connection
+  delay (5000);
+}
+
+void loop () {
+  Watchdog.enable (8000);
+  DateTime now = RTC.now();
+
+  lcd.clear();
+  lcd.setCursor (0, 0);
+  lcd.print("BlugraphTechnologies");
+  lcd.setCursor (0, 1);
+  lcd.print("Unix: ");
+  lcd.print(now.unixtime());
+  lcd.setCursor (0, 2);
+  lcd.print (now.day(), DEC);
+  lcd.print ("/");
+  lcd.print(now.month(), DEC);
+  lcd.print ("/");
+  lcd.print (now.year(), DEC);
+  lcd.print ("  ");
+  lcd.print (now.hour(), DEC);
+  lcd.print (":");
+  lcd.print (now.minute(), DEC);
+  lcd.print (":");
+  lcd.print (now.second(), DEC);
+
+  if (Serial.available() > 0) {
+    inst = Serial.readString(); // read the incoming byte:
+//    Serial.println(inst);
+    if (inst=="R"){
+      rd=1;
+//      Serial.println("Read detected");   
+    }
+
+}
+
+  //if (digitalRead(PB) == LOW || (now.minute() % 5 == 0 && now.second() < 5))
+  if (digitalRead(PB) == LOW || (rd==1))
+  {
+    rd=0;
+    Sampling(7000);
+  }
+
+  delay (1000);
+  Watchdog.reset();
+}
+
+void Sampling (int t)
+{
+  String dataM, dataD, dataD0, dataD1, dataD2, dataString;
+  String D[9] = {}; // 1 address + 8 data readings
+  int commaPosition;
+
+  lcd.clear();
+  lcd.setCursor (0, 1);
+  lcd.print("Sampling.......");
+  dataM = connection.sdi_query("0M!", 1000);
+  for (int j = 0; j < 15; j++)
+  {
+    delay (1000);
+    Watchdog.reset();
+  }
+
+  dataD0 = connection.sdi_query("0D0!", 1000);
+  dataD1 = connection.sdi_query("0D1!", 1000);
+  dataD2 = connection.sdi_query("0D2!", 1000);
+
+  dataD0.replace("+", ",");
+  dataD0.replace("-", ",-");
+  dataD1.replace("+", ",");
+  dataD1.replace("-", ",-");
+  dataD2.replace("+", ",");
+  dataD2.replace("-", ",-");
+  //remove the address
+  dataD1 = dataD1.substring(1, dataD1.length());
+  dataD2 = dataD2.substring(1, dataD2.length());
+
+  dataString = dataD0 + dataD1 + dataD2;
+
+  for (int i = 0; i < 9; i++)
+  {
+    commaPosition = dataString.indexOf(',');
+    if (commaPosition != -1) {
+      D[i] = {dataString.substring(0, commaPosition)};
+      D[i].trim();
+      dataString = dataString.substring (commaPosition + 1, dataString.length());
+    }
+
+    else {
+      if (dataString.length() > 0) {
+        D[i] = {dataString};
+      }
+    }
+  }
+
+  DateTime now = RTC.now();
+
+  String seri= (String(now.day(), DEC)+"/"+String(now.month(), DEC)+"/"+String(now.year(), DEC)+" "+String(now.hour(), DEC)+":"+String(now.minute(), DEC)+":"+String(now.second(), DEC)+","+D[1]+","+D[2]+","+D[3]+","+D[4]+","+D[5]+","+D[6]+","+D[7]+","+D[8]);
+  Serial.println(seri);
+  Watchdog.reset();
+
+  lcd.clear();
+  lcd.setCursor (0, 0);
+  lcd.print("Temp: ");
+  lcd.print (D[1]);
+
+  lcd.setCursor (0, 1);
+  lcd.print("DO: ");
+  lcd.print (D[2]);
+
+  lcd.setCursor (0, 2);
+  lcd.print("pH: ");
+  lcd.print (D[3]);
+
+  lcd.setCursor (0, 3);
+  lcd.print("ORP: ");
+  lcd.print (D[4]);
+  delay (7000);
+  Watchdog.reset();
+
+  lcd. clear();
+  lcd.setCursor (0, 0);
+  lcd.print("Salinity: ");
+  lcd.print (D[5]);
+
+  lcd.setCursor (0, 1);
+  lcd.print("Chl-A: ");
+  lcd.print (D[6]);
+
+  lcd.setCursor (0, 2);
+  lcd.print("Depth: ");
+  lcd.print (D[7]);
+
+  lcd.setCursor (0, 3);
+  lcd.print("Batt: ");
+  lcd.print (D[8]);
+  delay (7000);
+  Watchdog.reset();
+}
